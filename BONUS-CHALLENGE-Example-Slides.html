@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Bonus Challenge Day 18 — LLM Observability Lakehouse | Bài Mẫu Sinh Viên</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  :root {
+    --vin-red: #B41E2D;
+    --vin-blue: #002855;
+    --vin-gold: #C9A961;
+    --bg-dark: #0E1530;
+    --bg-card: #1A2444;
+    --text-light: #F0F4FF;
+    --text-muted: #9AA8C7;
+    --bronze: #CD7F32;
+    --silver: #C0C0C0;
+    --gold: #FFD700;
+    --green: #4ADE80;
+    --red: #F87171;
+    --blue: #60A5FA;
+    --purple: #A78BFA;
+    --orange: #FB923C;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: var(--bg-dark);
+    color: var(--text-light);
+    font-family: -apple-system, "SF Pro Display", "Segoe UI", "Helvetica Neue", "Inter", "Noto Sans", sans-serif;
+    overflow: hidden;
+  }
+  .deck { position: relative; width: 100vw; height: 100vh; }
+  .slide {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    padding: 40px 60px;
+    display: none;
+    flex-direction: column;
+    overflow-y: auto;
+    animation: fadeIn 0.4s ease-in-out;
+  }
+  .slide.active { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  h1 { font-size: 2.4em; color: var(--vin-gold); margin-bottom: 10px; line-height: 1.2; }
+  h2 { font-size: 1.6em; color: var(--vin-gold); margin-bottom: 18px; border-bottom: 2px solid var(--vin-red); padding-bottom: 6px; }
+  h3 { font-size: 1.2em; color: var(--blue); margin: 14px 0 8px; }
+  h4 { font-size: 1.05em; color: var(--orange); margin: 10px 0 6px; }
+  p, li { font-size: 1em; line-height: 1.55; color: var(--text-light); }
+  ul, ol { padding-left: 24px; margin: 8px 0; }
+  li { margin-bottom: 5px; }
+  code, .kbd {
+    font-family: "SF Mono", "Fira Code", Menlo, Consolas, monospace;
+    background: rgba(255,255,255,0.08);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--vin-gold);
+    font-size: 0.92em;
+  }
+  pre {
+    background: #0A1228;
+    border-left: 3px solid var(--blue);
+    padding: 12px 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-family: "SF Mono", "Fira Code", Menlo, Consolas, monospace;
+    font-size: 0.82em;
+    line-height: 1.45;
+    color: #E5E9F0;
+    margin: 10px 0;
+  }
+  pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
+  .header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 16px;
+    color: var(--text-muted);
+    font-size: 0.85em;
+  }
+  .header .brand { color: var(--vin-red); font-weight: 700; letter-spacing: 0.5px; }
+  .footer {
+    position: absolute; bottom: 12px; left: 60px; right: 60px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 0.78em; color: var(--text-muted);
+    border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;
+  }
+  .nav {
+    position: fixed; bottom: 12px; right: 16px;
+    display: flex; gap: 6px; z-index: 100;
+  }
+  .nav button {
+    background: var(--vin-blue); color: var(--text-light);
+    border: 1px solid var(--vin-gold); border-radius: 4px;
+    padding: 6px 12px; cursor: pointer; font-size: 0.9em;
+  }
+  .nav button:hover { background: var(--vin-red); }
+  .progress {
+    position: fixed; top: 0; left: 0; height: 3px;
+    background: var(--vin-gold); transition: width 0.3s;
+    z-index: 100;
+  }
+
+  /* Title slide */
+  .title-slide {
+    align-items: center; justify-content: center; text-align: center;
+    background: radial-gradient(circle at 30% 40%, rgba(180,30,45,0.25) 0%, transparent 60%),
+                radial-gradient(circle at 70% 60%, rgba(0,40,85,0.4) 0%, transparent 70%);
+  }
+  .title-slide h1 {
+    font-size: 3.4em; margin-bottom: 12px;
+    background: linear-gradient(135deg, var(--vin-gold) 0%, #FFE9A8 50%, var(--vin-red) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .title-slide .subtitle { font-size: 1.4em; color: var(--text-muted); margin-bottom: 30px; }
+  .title-slide .badge {
+    display: inline-block; padding: 6px 14px;
+    background: var(--vin-red); color: white;
+    border-radius: 16px; font-size: 0.9em; margin-bottom: 16px;
+    letter-spacing: 1px; text-transform: uppercase;
+  }
+  .title-slide .author {
+    margin-top: 30px; padding: 14px 24px;
+    background: rgba(255,255,255,0.05); border-radius: 8px;
+    border: 1px solid rgba(201,169,97,0.3);
+  }
+
+  /* 2-col / 3-col grid */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+  /* Cards */
+  .card {
+    background: var(--bg-card); border-radius: 8px;
+    padding: 14px 18px; border-left: 3px solid var(--vin-gold);
+  }
+  .card.bronze { border-left-color: var(--bronze); }
+  .card.silver { border-left-color: var(--silver); }
+  .card.gold { border-left-color: var(--gold); }
+  .card.green { border-left-color: var(--green); }
+  .card.red { border-left-color: var(--red); }
+  .card.blue { border-left-color: var(--blue); }
+  .card.purple { border-left-color: var(--purple); }
+  .card.orange { border-left-color: var(--orange); }
+  .card .label {
+    font-size: 0.75em; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--text-muted); margin-bottom: 4px;
+  }
+
+  /* Comparison table */
+  table {
+    width: 100%; border-collapse: collapse;
+    margin: 8px 0; font-size: 0.9em;
+  }
+  th {
+    background: var(--vin-blue); color: var(--vin-gold);
+    text-align: left; padding: 8px 12px;
+    border-bottom: 2px solid var(--vin-gold);
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    vertical-align: top;
+  }
+  tr:hover td { background: rgba(255,255,255,0.03); }
+  td.score { text-align: center; font-weight: bold; }
+  td.win { color: var(--green); }
+  td.lose { color: var(--red); }
+  td.mid { color: var(--orange); }
+
+  /* Insight callout */
+  .insight {
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: linear-gradient(90deg, rgba(201,169,97,0.15) 0%, rgba(201,169,97,0.02) 100%);
+    border-left: 3px solid var(--vin-gold);
+    border-radius: 4px;
+    font-style: italic;
+    color: #FFE9A8;
+  }
+  .insight::before { content: "🤔 Tôi nhận ra: "; font-weight: 700; font-style: normal; }
+
+  /* Pipeline diagram */
+  .pipeline {
+    display: flex; align-items: center; justify-content: space-around;
+    padding: 16px; background: rgba(255,255,255,0.03);
+    border-radius: 8px; margin: 10px 0;
+    flex-wrap: wrap; gap: 8px;
+  }
+  .stage {
+    flex: 1; min-width: 130px;
+    text-align: center; padding: 12px;
+    background: var(--bg-card); border-radius: 6px;
+    border-top: 3px solid var(--vin-gold);
+  }
+  .stage.bronze { border-top-color: var(--bronze); }
+  .stage.silver { border-top-color: var(--silver); }
+  .stage.gold { border-top-color: var(--gold); }
+  .stage h4 { margin-top: 0; }
+  .stage .icon { font-size: 1.8em; margin-bottom: 6px; }
+  .arrow { color: var(--vin-gold); font-size: 1.6em; padding: 0 4px; }
+
+  /* Status pills */
+  .pill {
+    display: inline-block; padding: 2px 8px;
+    border-radius: 10px; font-size: 0.75em;
+    font-weight: bold; margin-right: 4px;
+  }
+  .pill.green { background: rgba(74,222,128,0.2); color: var(--green); border: 1px solid var(--green); }
+  .pill.red { background: rgba(248,113,113,0.2); color: var(--red); border: 1px solid var(--red); }
+  .pill.orange { background: rgba(251,146,60,0.2); color: var(--orange); border: 1px solid var(--orange); }
+  .pill.blue { background: rgba(96,165,250,0.2); color: var(--blue); border: 1px solid var(--blue); }
+
+  /* Big number */
+  .stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+    margin: 14px 0;
+  }
+  .stat-card {
+    text-align: center; padding: 16px;
+    background: var(--bg-card); border-radius: 8px;
+    border-bottom: 3px solid var(--vin-gold);
+  }
+  .stat-card .num {
+    font-size: 2em; font-weight: 800;
+    color: var(--vin-gold); display: block;
+  }
+  .stat-card .lbl {
+    font-size: 0.8em; color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  /* Two-column compact */
+  .col-2 { columns: 2; column-gap: 28px; }
+  .col-2 li { break-inside: avoid; }
+
+  /* Decision matrix */
+  .matrix-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .matrix-row.header { font-weight: bold; color: var(--vin-gold); border-bottom: 2px solid var(--vin-gold); }
+  .matrix-row.winner { background: rgba(74,222,128,0.08); border-left: 3px solid var(--green); padding-left: 8px; }
+</style>
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+
+<div class="deck" id="deck">
+
+<!-- ─────────────────────────── Slide 1: Title ─────────────────────────── -->
+<section class="slide title-slide active">
+  <div class="badge">Bonus Challenge — Day 18 Track 2</div>
+  <h1>Lakehouse cho LLM Observability</h1>
+  <p class="subtitle">Bài mẫu sinh viên — Brainstorm, Quyết định, Thiết kế, Giải quyết</p>
+  <div class="author">
+    <p style="font-size: 0.95em; margin-bottom: 4px;"><strong>Sinh viên:</strong> Nguyễn Văn An (giả lập)</p>
+    <p style="color: var(--text-muted); font-size: 0.9em;">VinUni · AI20k · Day 18 — Track 2: Data Lakehouse Architecture</p>
+    <p style="color: var(--text-muted); font-size: 0.85em; margin-top: 4px;">📅 04/05/2026</p>
+  </div>
+  <p style="margin-top: 30px; font-size: 0.85em; color: var(--text-muted);">▶ Bấm <strong>→</strong> hoặc <strong>Space</strong> để chuyển slide</p>
+</section>
+
+<!-- ─────────────────────────── Slide 2: Đề bài ─────────────────────────── -->
+<section class="slide">
+  <div class="header"><span class="brand">VinUni AI20k</span><span>Day 18 Bonus · Slide 2/16</span></div>
+  <h2>📋 Đề bài Bonus Challenge</h2>
+  <p>Trích nguyên văn từ <code>BONUS-CHALLENGE.md</code>:</p>
+  <div class="card blue" style="margin: 14px 0;">
+    <p><em>"Thiết kế lakehouse cho 1 hard problem. Pick một trong các options:</em></p>
+    <ul style="margin-top: 8px;">
+      <li>🤖 <strong>LLM Observability</strong> — log inference req/resp, token usage, cost, latency, eval scores</li>
+      <li>🇻🇳 <strong>Decree-13/2023/NĐ-CP CDC</strong> — replicate Postgres → Lakehouse với compliance trên data cá nhân</li>
+      <li>🖼️ <strong>Multimodal RAG</strong> — image + text + audio embeddings cho retrieval</li>
+      <li>💰 <strong>FinOps tiering</strong> — hot/warm/cold storage với auto-lifecycle</li>
+      <li>🔄 <strong>Catalog migration</strong> — Hive Metastore → Iceberg REST Catalog</li>
+    </ul>
+    <p style="margin-top: 8px;"><em>Yêu cầu output: Architecture diagram + schema + ops decisions + trade-offs."</em></p>
+  </div>
+  <div class="insight">Đề mở — không có "đáp án đúng". Tôi cần <strong>chọn 1 problem</strong>, <strong>biện luận lý do chọn</strong>, rồi mới được phép thiết kế. Brainstorm đầu tiên là về <em>chọn đề</em>, không phải về solution.</div>
+  <div class="footer"><span>BONUS-CHALLENGE.md</span><span>2 / 16</span></div>
+</section>
+
+<!-- ─────────────────────────── Slide 3: Brainstorm — chọn problem ─────────────────────────── -->
+<section class="slide">
+  <div class="header"><span class="brand">VinUni AI20k</span><span>BRAINSTORM · Slide 3/16</span></div>
+  <h2>🧠 Brainstorm: Chọn problem nào?</h2>
+  <p style="margin-bottom: 10px;">Tôi xây 1 ma trận quyết định. <strong>5 tiêu chí</strong>, mỗi tiêu chí 1–5 điểm:</p>
+  <div style="font-size: 0.85em;">
+    <div class="matrix-row header">
+      <span>Problem</span>
+      <span style="text-align: center;">Hợp với<br>AI course?</span>
+      <span style="text-align: center;">Có data<br>ảo dễ tạo?</span>
+      <span style="text-align: center;">Cover<br>medallion?</span>
+      <span style="text-align: center;">Show được<br>Delta ACID?</span>
+      <span style="text-align: center;">Tổng</span>
+    </div>
+    <div class="matrix-row winner">
+      <span><strong>🤖 LLM Observability</strong></span>
+      <span style="text-align: center;">5</span>
+      <span style="text-align: center;">5</span>
+      <span style="text-align: center;">5</span>
+      <span style="text-align: center;">4</span>
+      <span style="text-align: center; color: var(--green); font-weight: bold;">19 ⭐</span>
+    </div>
+    <div class="matrix-row">
+      <span>🇻🇳 Decree-13 CDC</span>
+      <span style="text-align: center;">3</span>
+      <span style="text-align: center;">3</span>
+      <span style="text-align: center;">4</span>
+      <span style="text-align: center;">5</span>
+      <span style="text-align: center;">15</span>
+    </div>
+    <div class="matrix-row">
+      <span>🖼️ Multimodal RAG</span>
+      <span style="text-align: center;">5</span>
+      <span style="text-align: center;">2</span>
+      <span style="text-align: center;">3</span>
+      <span style="text-align: center;">3</span>
+      <span style="text-align: center;">13</span>
+    </div>
+    <div class="matrix-row">
+      <span>💰 FinOps tiering</span>
+      <span style="text-align: center;">2</span>
+      <span style="text-align: center;">4</span>
+      <span style="text-align: center;">3</span>
+      <span style="text-align: center;">3</span>
+      <span style="text-align: center;">12</span>
+    </div>
+    <div class="matrix-row">
+      <span>🔄 Catalog migration</span>
+      <span style="text-align: center;">2</span>
+      <span style="text-align: center;">2</span>
+      <span style="text-align: center;">2</span>
+      <span style="text-align: center;">2</span>
+      <span style="text-align: center;">8</span>
+    </div>
+  </div>
+  <div class="insight"><strong>LLM Observability thắng</strong> vì: (a) trực tiếp liên quan AI20k, (b) tôi có thể fake req/resp dễ dàng bằng OpenAI SDK, (c) có đủ JSON raw → cleaned → aggregated để thể hiện 3 tầng Bronze/Silver/Gold, (d) có MERGE upsert (eval scores đến trễ → update row cũ) để show Delta ACID.</div>
+  <div class="footer"><span>Decision matrix</span><span>3 / 16</span></div>
+</section>
+
+<!-- ─────────────────────────── Slide 4: Problem statement ─────────────────────────── -->
+<section class="slide">
+  <div class="header"><span class="brand">VinUni AI20k</span><span>PROBLEM · Slide 4/16</span></div>
+  <h2>🎯 Problem Statement: Tôi đang giải gì?</h2>
+  <div class="grid-2">
+    <div class="card red">
+      <div class="label">😱 Pain point</div>
+      <p>Một startup VN deploy chatbot dùng <strong>GPT-4o + Claude Opus 4.7</strong>. CEO hỏi:</p>
+      <ul style="margin-top: 6px;">
+        <li>"Hôm qua chúng ta tốn bao nhiêu tiền API?"</li>
+        <li>"User nào đang spam? Tốn nhất?"</li>
+        <li>"Latency p95 có tăng tuần này không?"</li>
+        <li>"Câu trả lời nào bị user thumb-down?"</li>
+      </ul>
+      <p style="margin-top: 6px; color: var(--text-muted); font-size: 0.85em;">→ Hiện tại: log file rời rạc, Excel thủ công, không trả lời được.</p>
+    </div>
+    <div class="card green">
+      <div class="label">✅ Success criteria</div>
+      <ul>
+        <li>Truy vấn cost/latency/quality theo user/model/route trong <strong>&lt;3s</strong></li>
+        <li>Reproducible — query 1 tuần trước phải ra kết quả y hệt</li>
+        <li>Eval score đến trễ (3-7 ngày sau) phải <strong>upsert vào row cũ</strong></li>
+        <li>Hỗ trợ <strong>time travel</strong> để debug "tại sao tuần trước cost đột biến?"</li>
+        <li>Sẵn sàng cho ML team train reward model trên feedback data</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card orange" style="margin-top: 14px;">
+    <div class="label">📦 Scope (cho project 1 tuần)</div>
+    <p>1 chatbot, 3 model providers (OpenAI, Anthropic, Cohere), ~100k requests/ngày, 1 region (Singapore). Multi-tenant: 5 customer accounts. Eval = thumbs up/down + LLM-as-judge offline.</p>
+  </div>
+  <div class="insight">Viết problem statement <em>trước khi vẽ kiến trúc</em> là điều tôi thường skip. Nhưng nếu không biết SLA (3s query, 100k req/ngày), tôi sẽ over-engineer — vd dùng Spark cluster thay vì DuckDB.</div>
+  <div class="footer"><span>Problem framing</span><span>4 / 16</span></div>
+</section>
+
+<!-- ─────────────────────────── Slide 5: Decision — table format ─────────────────────────── -->
+<section class="slide">
+  <div class="header"><span class="brand">VinUni AI20k</span><span>DECISION · Slide 5/16</span></div>
+  <h2>⚖️ Decision 1: Delta vs Iceberg vs Hudi?</h2>
+  <table>
+    <thead>
+      <tr><th>Tiêu chí</th><th>Delta Lake</th><th>Apache Iceberg</th><th>Apache Hudi</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Workload chính của tôi</td>
+        <td class="win">Append + MERGE</td>
+        <td class="mid">Append + MERGE</td>
+        <td class="win">Upsert-heavy</td>
+      </tr>
+      <tr>
+        <td>Engine ưu tiên</td>
+        <td class="win">Spark, DuckDB qua delta-rs</td>
+        <td>Spark, Trino, Flink</td>
+        <td>Spark, Flink</td>
+      </tr>
+      <tr>
+        <td>Học ngắn 1 tuần</td>
+        <td class="win">Dễ nhất (Python API mượt)</td>
+        <td class="mid">Trung bình</td>
+        <td class="lose">Khó nhất</td>
+      </tr>
+      <tr>
+        <td>Time travel + RESTORE</td>
+        <td class="win">✅ <code>RESTORE VERSION AS OF</code></td>
+        <td class="win">✅ snapshot id</td>
+        <td class="mid">Có nhưng phức tạp hơn</td>
+      </tr>
+      <tr>
+        <td>Lab repo dùng sẵn</td>
+        <td class="win">✅ NB1–NB4 đã dùng Delta</td>
+        <td class="lose">Phải tự setup</td>
+        <td class="lose">Phải tự setup</td>
+      </tr>
+      <tr>
+        <td>Hidden partitioning</td>
+        <td class="lose">❌ Cần explicit</td>
+        <td class="win">✅ <code>days(ts)</code></td>
+        <td class="mid">Không trực tiếp</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="card green" style="margin-top: 14px;">
+    <div class="label">🏆 Chọn: Delta Lake (qua delta-rs + DuckDB)</div>
+    <p>Vì: (1) tôi đã quen từ NB1–NB4, không tốn thời gian học lại; (2) workload "append + MERGE eval scores" hợp Delta; (3) DuckDB query cho cost/latency &lt;3s đủ với 100k req/ngày. <strong>Trade-off chấp nhận:</strong> mất hidden partitioning của Iceberg → phải explicit partition theo <code>date</code>.</p>
+  </div>
+  <div class="insight">Lúc đầu tôi định chọn Iceberg vì "feature đẹp hơn". Nhưng so với constraint "1 tuần + đã có lab Delta", chọn cái mình quen <strong>tốt hơn</strong> chọn cái fancy hơn. Engineering = tradeoffs, không phải feature collection.</div>
+  <div class="footer"><span>Format selection</span><span>5 / 16</span></div>
+</section>
+
+<!-- ─────────────────────────── Slide 6: Architecture diagram ─────────────────────────── -->
+<section class="slide">
+  <div class="header"><span class="brand">VinUni AI20k</span><span>DESIGN · Slide 6/16</span></div>
+  <h2>🏗️ Kiến trúc tổng thể</h2>
+  <div class="pipeline">
+    <div class="stage" style="border-top-color: var(--blue);">
+      <div class="icon">🤖</div>
+      <h4>Source</h4>
+      <p style="font-size: 0.85em;">Chatbot SDK<br>middleware</p>
+    </div>
+    <span class="arrow">→</span>
+    <div class="stage" style="border-top-color: var(--orange);">
+      <div class="icon">📨</div>
+      <h4>Ingest</h4>
+      <p style="font-size: 0.85em;">Kafka topic<br><code>llm.events.v1</code></p>
+    </div>
+    <span class="arrow">→</span>
+    <div class="stage bronze">
+      <div class="icon">🥉</div>
+      <h4>Bronze</h4>
+      <p style="font-size: 0.85em;">Raw JSON<br>30d retention</p>
+    </div>
+    <span class="arrow">→</span>
+    <div class="stage silver">
+      <div class="icon">🥈</div>
+      <h4>Silver</h4>
+      <p style="font-size: 0.85em;">Cleaned, dedup<br>+ joined eval</p>
+    </div>
+    <span class="arrow">→</span>
+    <div class="stage gold">
+      <div class="icon">🥇</div>
+      <h4>Gold</h4>
+      <p style="font-size: 0.85em;">Daily KPI<br>cost/lat/quality</p>
+    </div>
+    <span class="arrow">→</span>
+    <div class="stage" style="border-top-color: var(--purple);">
+      <div class="icon">📊</div>
+      <h4>Serve</h4>
+      <p style="font-size: 0.85em;">DuckDB →<br>Metabase</p>
+    </div>
+  </div>
+  <div class="grid-2" style="margin-top: 14px;">
+    <div class="card blue">
+      <div class="label">Storage</div>
+      <p><strong>S3</strong> (prod) hoặc <strong>MinIO</strong> (dev/on-prem). Path: <code>s3://lh-llm-obs/{bronze,silver,gold}/</code></p>
+    </div>
+    <div class="card purple">
+      <div class="label">Catalog</div>
+      <p><strong>AWS Glue</strong> cho prod, <strong>Lakekeeper</strong> (REST Catalog) cho dev — schema discovery cross-engine</p>
+    </div>
+    <div class="card orange">
+      <div class="label">Compute</div>
+      <p>Bronze→Silver: <strong>Spark Structured Streaming</strong> (5-min micro-batch). Silver→Gold: <strong>dbt + DuckDB</strong> (daily cron).</p>
+    </div>
+    <div class="card green">
+      <div class="label">Quality + lineage</div>
+      <p><strong>Great Expectations</strong> ở mỗi gate, <strong>OpenLineage → Marquez</strong> trace dòng chảy data.</p>
+    </div>
+  </div>
+  <div class="insight">Tôi vẽ diagram <em>linear</em> chứ không vẽ "đám mây icon" như nhiều bài. Linear giúp người đọc trace được "input → output" mà không lost. Decoration thêm sau, structure đúng trước.</div>
+  <div class="footer"><span>Architecture overview</span><span>6 / 16</span></div>
+</section>
+
+<!-- ─────────────────────────── Slide 7: Bronze schema ─────────────────────────── -->
+<section class="slide">
+  <div class="header"><span class="brand">VinUni AI20k</span><span>SCHEMA · Slide 7/16</span></div>
+  <h2>🥉 Bronze Layer: Raw event log</h2>
+  <p>Mục tiêu: <strong>NHẬN HẾT, KHÔNG LỌC</strong>. Schema permissive, retention 30 ngày, partition theo ngày để vacuum dễ.</p>
+  <pre><code>-- Path: s3://lh-llm-obs/bronze/llm_events/
+-- Format: Delta, partitioned by ingest_date
+
+CREATE TABLE bronze.llm_events (
+  event_id        STRING,         -- UUIDv7 từ middleware
+  raw_payload     STRING,         -- JSON string nguyên gốc, không parse
+  source_topic    STRING,         -- "openai", "anthropic", "cohere"
+  ingest_ts       TIMESTAMP,      -- Khi Kafka consumer ghi vào Bronze
+  ingest_date     DATE,           -- DERIVED COL cho partitioning
+  kafka_offset    BIGINT,         -- Để replay/dedup
+  schema_version  STRING          -- "v1" — đổi khi producer breaking change
+)
+USING DELTA
+PARTITIONED BY (ingest_date)
+TBLPROPERTIES (
+  'delta.logRetentionDuration' = '30 days',
+  'delta.deletedFileRetentionDuration' = '30 days'
+);</code></pre>
+  <div class="grid-2" style="margin-top: 12px;">
+    <div class="card bronze">
+      <div class="label">Vì sao chỉ lưu raw JSON?</div>
+      <p>Tôi <strong>không biết tương lai</strong> mình cần field nào. Lưu raw → schema downstream có thể evolve mà <em>không cần re-ingest</em>. Đây là Bronze rule: <em>preserve everything</em>.</p>
+    </div>
+    <div class="card red">
+      <div class="label">Common mistake tôi tránh</div>
+      <p>Không parse JSON ở Bronze. Nếu parse → 1 field NULL/format lạ làm fail toàn batch. Bronze phải là <em>"không bao giờ fail"</em>.</p>
+    </div>
+  </div>
+  <div class="insight">Field <code>schema_version</code> là 1 trick tôi học từ slide 23 (Data Contracts). Khi producer thay đổi schema, ta thêm "v2" → consumer biết route khác nhau, không bị silent corruption.</div>
+  <div class="footer"><span>Bronze schema</span><span>7 / 16</span></div>
+</section>
+
+<!-- ─────────────────────────── Slide 8: Silver schema ─────────────────────────── -->
+<section class="slide">
+  <div class="header"><span class="brand">VinUni AI20k</span><span>SCHEMA · Slide 8/16</span></div>
+  <h2>🥈 Silver Layer: Cleaned + Joined</h2>
+  <pre><code>-- Path: s3://lh-llm-obs/silver/llm_inferences/
+-- Z-ORDER by (tenant_id, model)
+
+CREATE TABLE silver.llm_inferences (
+  inference_id      STRING NOT NULL,
+  tenant_id         STRING NOT NULL,
+  user_id           STRING,
+  session_id        STRING,
+  request_ts        TIMESTAMP NOT NULL,
+  request_date      DATE NOT NULL,            -- Partition col
+  provider          STRING,                   -- openai|anthropic|cohere
+  model             STRING,                   -- "gpt-4o", "claude-opus-4-7"...
+  route             STRING,                   -- "chat", "embed", "tool"
+  prompt_tokens     INT,
+  completion_tokens INT,
+  total_tokens      INT GENERATED ALWAYS AS (prompt_tokens + completion_tokens),
+  cost_usd          DECIMAL(10, 6),
+  latency_ms        INT,
+  status            STRING,                   -- "ok", "rate_limited", "error"
+  error_code        STRING,                   -- nullable
+  -- Eval cols (đến trễ qua MERGE — initially NULL)
+  user_feedback     STRING,                   -- "thumbs_up" | "thumbs_down" | NULL
+  judge_score       FLOAT,                    -- 0.0–1.0, từ LLM-as-judge offline
+  judge_ts          TIMESTAMP,                -- Khi nào eval được merge vào
+  -- Lineage
+  bronze_event_id   STRING,                   -- back-pointer to bronze
+  silver_run_id     STRING                    -- which dbt run created this row
+)
+USING DELTA
+PARTITIONED BY (request_date);</code></pre>
+  <div class="grid-2" style="margin-top: 8px;">
+    <div class="card silver">
+      <div class="label">Z-ORDER chọn (tenant_id, model)</div>
+      <p>Vì query phổ biến nhất là <em>"cost của tenant X dùng model Y"</em>. Z-ORDER co-locate 2 cột này → file pruning &gt; 10× theo lab NB2.</p>
+    </div>
+    <div class="card orange">
+      <div class="label">Eval cols nullable</div>
+      <p>Lúc Silver được tạo (5 phút sau request), <strong>eval chưa có</strong>. Khi user click 👍/👎, ta MERGE vào row cũ → time travel vẫn xem được "trước khi có eval".</p>
+    </div>
+  </div>
+  <div class="insight">Cột <code>silver_run_id</code> là cách tôi <em>self-document lineage</em>: nếu data sai, tôi join với <code>dbt_runs</code> table biết ngay batch nào lỗi → debug nhanh hơn nhiều so với git blame.</div>
+  <div class="footer"><span>Silver schema</span><span>8 / 16</span></div>
+</section>
+
+<!-- ─────────────────────────── Slide 9: Gold schema + eval merge ─────────────────────────── -->
+<section class="slide">
+  <div class="header"><span class="brand">VinUni AI20k</span><span>SCHEMA · Slide 9/16</span></div>
+  <h2>🥇 Gold Layer + MERGE pattern</h2>
+  <h3>Gold tables (3 marts)</h3>
+  <div class="grid-3">
+    <div class="card gold">
+      <div class="label">gold.daily_cost_kpi</div>
+      <p style="font-size: 0.85em;">tenant_id, model, date, total_cost_usd, request_count, error_rate, p50/p95/p99 latency</p>
+    </div>
+    <div class="card gold">
+      <div class="label">gold.user_quality</div>
+      <p style="font-size: 0.85em;">user_id, week, judge_avg, thumbs_up_rate, thumbs_down_rate, retention_proxy</p>
+    </div>
+    <div class="card gold">
+      <div class="label">gold.spam_suspects</div>
+      <p style="font-size: 0.85em;">user_id, day, req_count, cost_usd, anomaly_score (z-score &gt; 3)</p>
+    </div>
+  </div>
+  <h3 style="margin-top: 14px;">Eval MERGE pattern (key insight)</h3>
+  <pre><code>-- Khi user click 👍/👎, hoặc khi LLM-as-judge batch chạy xong
+MERGE INTO silver.llm_inferences AS target
+USING staging.eval_updates AS source
+  ON target.inference_id = source.inference_id
+WHEN MATCHED THEN UPDATE SET
+  target.user_feedback = source.user_feedback,
+  target.judge_score   = source.judge_score,
+  target.judge_ts      = current_timestamp();
+
+-- Sau MERGE, _delta_log ghi version mới
+-- → time travel vẫn xem được "trước khi có eval" để so sánh
+SELECT * FROM silver.llm_inferences VERSION AS OF 42;</code></pre>
+  <div class="insight">MERGE + time travel cùng nhau cho phép tôi trả lời câu hỏi <em>"liệu eval pipeline mới có gắn judge_score đúng không?"</em> — chỉ cần so sánh <code>VERSION AS OF before</code> với <code>VERSION AS OF after</code>. Không cần snapshot DB thủ công.</div>
+  <div class="footer"><span>Gold + MERGE</span><span>9 / 16</span></div>
+</section>
+
+<!-- ─────────────────────────── Slide 10: Ops decisions ─────────────────────────── -->
+<section class="slide">
+  <div class="header"><span class="brand">VinUni AI20k</span><span>OPS · Slide 10/16</span></div>
+  <h2>⚙️ Production Ops Decisions</h2>
+  <div class="grid-2">
+    <div class="card blue">
+      <div class="label">📅 Compaction schedule</div>
+      <ul style="font-size: 0.9em;">
+        <li><code>OPTIMIZE</code> daily lúc 03:00 (off-peak)</li>
+        <li><code>VACUUM</code> 7 ngày retention (compliance team OK)</li>
+        <li>Z-ORDER lại weekly khi data drift</li>
+      </ul>
+    </div>
+    <div class="card green">
+      <div class="label">📋 Data contracts</div>
+      <ul style="font-size: 0.9em;">
+        <li>Schema version pinned ở producer SDK</li>
+        <li>Breaking change → bump <code>v1</code>→<code>v2</code> + dual write 2 tuần</li>
+        <li>Great Expectations check ở Bronze→Silver gate</li>
+      </ul>
+    </div>
+    <div class="card purple">
+      <div class="label">🔍 Lineage</div>
+      <ul style="font-size: 0.9em;">
+        <li>OpenLineage emit từ Spark + dbt</li>
+        <li>Marquez UI: trace 1 row Gold ngược về Kafka offset</li>
+        <li>Quan trọng nếu CEO hỏi "số này từ đâu?"</li>
+      </ul>
+    </div>
+    <div class="card orange">
+      <div class="label">💰 FinOps tier</div>
+      <ul style="font-size: 0.9em;">
+        <li>Bronze: S3 Standard 30d → S3 IA → Glacier 1 năm</li>
+        <li>Silver: S3 Standard 90d → IA</li>
+        <li>Gold: S3 Standard mãi mãi (nhỏ, hot)</li>
+      </ul>
+    </div>
+    <div class="card red">
+      <div class="label">🚨 Alerting</div>
+      <ul style="font-size: 0.9em;">
+        <li>Silver row count &lt; Bronze ×0.95 → alert (drop quá nhiều)</li>
+        <li>Cost daily &gt; baseline ×1.5 → alert (chi tiêu bất thường)</li>
+        <li>p95 latency &gt; 5s sustained → alert</li>
+      </ul>
+    </div>
+    <div class="card" style="border-left-color: var(--vin-gold);">
+      <div class="label">🔐 Compliance (PII)</div>
+      <ul style="font-size: 0.9em;">
+        <li>Prompt/response → hash PII trước khi vào Silver</li>
+        <li>Right-to-be-forgotten: <code>DELETE WHERE user_id=X</code> + VACUUM</li>
+        <li>Audit log: ai/khi nào read Gold</li>
+      </ul>
+    </div>
+  </div>
+  <div class="insight">Tôi không định viết phần PII ban đầu. Nhưng vì AI20k ở VN — <strong>Decree 13/2023/NĐ-CP</strong> bắt buộc handle data cá nhân. Nếu skip phần này, kiến trúc <em>không production-ready</em>.</div>
+  <div class="footer"><span>Operations</span><span>10 / 16</span></div>
+</section>
+
+<!-- ─────────────────────────── Slide 11: Trade-offs ─────────────────────────── -->
+<section class="slide">
+  <div class="header"><span class="brand">VinUni AI20k</span><span>TRADE-OFFS · Slide 11/16</span></div>
+  <h2>⚖️ Trade-offs (cái tôi cố ý từ chối)</h2>
+  <table>
+    <thead>
+      <tr><th>Lựa chọn của tôi</th><th>Cái tôi từ chối</th><th>Vì sao</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>5-min micro-batch</strong> Bronze→Silver</td>
+        <td>True streaming (Flink)</td>
+        <td>SLA cho dashboard là 15 phút. Streaming overkill, ops cost cao gấp 4×.</td>
+      </tr>
+      <tr>
+        <td><strong>Delta Lake</strong></td>
+        <td>Iceberg hidden partitioning</td>
+        <td>Tôi đã quen Delta từ NB1–NB4. 1 tuần không đủ học Iceberg cho production.</td>
+      </tr>
+      <tr>
+        <td><strong>DuckDB</strong> serve Gold</td>
+        <td>Trino cluster</td>
+        <td>Gold &lt; 1GB. DuckDB 1 node đủ &lt;3s. Trino cần 3+ node, ops phức tạp hơn nhiều.</td>
+      </tr>
+      <tr>
+        <td><strong>Hash PII tại Silver</strong></td>
+        <td>Encrypt-at-rest only</td>
+        <td>Hash = irreversible, an toàn hơn. Trade-off: không decrypt được khi cần debug.</td>
+      </tr>
+      <tr>
+        <td><strong>Gold rebuild full mỗi ngày</strong></td>
+        <td>Incremental updates</td>
+        <td>Đơn giản hơn, idempotent. Trade-off: tốn compute hơn nhưng &lt;5 phút nên OK.</td>
+      </tr>
+      <tr>
+        <td><strong>1 catalog</strong> (AWS Glue)</td>
+        <td>Multi-catalog (Glue + Unity + Polaris)</td>
+        <td>Single source of truth. Trade-off: vendor-lock vào AWS, nhưng dev MVP chấp nhận.</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="insight">Mỗi dòng "không chọn" ở đây đều có thể trở thành <em>future work</em>. Khi scale 10× (1M req/ngày), tôi sẽ revisit từng dòng. Đây gọi là <strong>"quyết định reversible"</strong> — chọn đơn giản trước, tối ưu sau khi có data thực.</div>
+  <div class="footer"><span>What I rejected</span><span>11 / 16</span></div>
+</section>
+
+<!-- ─────────────────────────── Slide 12: Failure scenarios + problem solving ─────────────────────────── -->
+<section class="slide">
+  <div class="header"><span class="brand">VinUni AI20k</span><span>PROBLEM SOLVING · Slide 12/16</span></div>
+  <h2>🔧 Problem solving: 4 failure scenarios</h2>
+  <div class="grid-2">
+    <div class="card red">
+      <div class="label">😱 Scenario 1: Kafka topic bị xóa nhầm</div>
+      <p><strong>Hậu quả:</strong> Mất raw events giữa T1 và T2.</p>
+      <p><strong>Giải pháp:</strong> Bronze đã ghi xuống S3 → an toàn. Re-process từ Bronze. <code>kafka_offset</code> giúp dedup khi producer replay.</p>
+    </div>
+    <div class="card red">
+      <div class="label">😱 Scenario 2: Eval pipeline bug ghi sai score</div>
+      <p><strong>Hậu quả:</strong> 10k row có judge_score sai.</p>
+      <p><strong>Giải pháp:</strong> <code>RESTORE TABLE silver.llm_inferences VERSION AS OF X</code> (version trước MERGE). Time travel cứu mạng.</p>
+    </div>
+    <div class="card red">
+      <div class="label">😱 Scenario 3: User yêu cầu xóa dữ liệu (Decree-13)</div>
+      <p><strong>Hậu quả:</strong> Phải xóa physically (không soft-delete).</p>
+      <p><strong>Giải pháp:</strong> <code>DELETE WHERE user_id=X</code> + <code>VACUUM RETAIN 0 HOURS</code> (cẩn thận: tắt time travel cho table này nếu cần).</p>
+    </div>
+    <div class="card red">
+      <div class="label">😱 Scenario 4: Cost spike đột ngột (CEO panic)</div>
+      <p><strong>Hậu quả:</strong> Cần biết ngay user/model nào.</p>
+      <p><strong>Giải pháp:</strong> Query Gold <code>spam_suspects</code> → list top user có anomaly_score &gt; 3 trong 24h. Lineage trace ngược Bronze để xem prompt thực.</p>
+    </div>
+  </div>
+  <div class="insight">Đặt câu hỏi <em>"Cái gì có thể đi sai?"</em> sớm giúp tôi <strong>thiết kế cho recovery</strong>, không chỉ cho happy path. Kafka offset, MERGE rollback, VACUUM 0h — những detail này không hiện trên diagram nhưng quyết định "production-ready" vs "demo-ware".</div>
+  <div class="footer"><span>Failure modes</span><span>12 / 16</span></div>
+</section>
+
+<!-- ─────────────────────────── Slide 13: Implementation roadmap ─────────────────────────── -->
+<section class="slide">
+  <div class="header"><span class="brand">VinUni AI20k</span><span>ROADMAP · Slide 13/16</span></div>
+  <h2>📅 Implementation Roadmap (1 tuần)</h2>
+  <table>
+    <thead>
+      <tr><th>Day</th><th>Task</th><th>Deliverable</th><th>Risk</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>D1</strong></td>
+        <td>Setup MinIO + Kafka local + producer SDK fake req/resp</td>
+        <td>10k events đẩy được vào Kafka</td>
+        <td><span class="pill blue">low</span></td>
+      </tr>
+      <tr>
+        <td><strong>D2</strong></td>
+        <td>Bronze ingest job (Spark Structured Streaming)</td>
+        <td>bronze.llm_events có data, <code>_delta_log/</code> visible</td>
+        <td><span class="pill blue">low</span></td>
+      </tr>
+      <tr>
+        <td><strong>D3</strong></td>
+        <td>Silver dbt models + Z-ORDER</td>
+        <td>NB2-style proof: query &gt;3× faster sau OPTIMIZE</td>
+        <td><span class="pill orange">med</span></td>
+      </tr>
+      <tr>
+        <td><strong>D4</strong></td>
+        <td>MERGE eval pipeline + time travel demo</td>
+        <td>RESTORE rollback hoạt động, history() ≥5 versions</td>
+        <td><span class="pill orange">med</span></td>
+      </tr>
+      <tr>
+        <td><strong>D5</strong></td>
+        <td>Gold marts + Metabase dashboard</td>
+        <td>3 marts query &lt;3s; dashboard show cost/latency/quality</td>
+        <td><span class="pill blue">low</span></td>
+      </tr>
+      <tr>
+        <td><strong>D6</strong></td>
+        <td>Great Expectations + OpenLineage integration</td>
+        <td>Marquez UI show full DAG; GE tests fail có alert</td>
+        <td><span class="pill red">high</span></td>
+      </tr>
+      <tr>
+        <td><strong>D7</strong></td>
+        <td>Buffer day: PII hash, write-up, slide</td>
+        <td>BONUS-CHALLENGE.md + slide deck (cái này 😉)</td>
+        <td><span class="pill blue">low</span></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="insight">D6 là risk cao nhất vì OpenLineage emitter có nhiều quirks tùy version. Tôi <strong>để buffer day D7</strong> — nếu D6 trễ, tôi vẫn nộp được. Khi học/làm 1 tuần, <em>luôn để 1 ngày buffer</em>, không bao giờ plan 7/7 ngày full.</div>
+  <div class="footer"><span>Week plan</span><span>13 / 16</span></div>
+</section>
+
+<!-- ─────────────────────────── Slide 14: Demo numbers ─────────────────────────── -->
+<section class="slide">
+  <div class="header"><span class="brand">VinUni AI20k</span><span>RESULTS · Slide 14/16</span></div>
+  <h2>📊 Kết quả demo (giả định nếu chạy thật)</h2>
+  <div class="stats">
+    <div class="stat-card">
+      <span class="num">100k</span>
+      <span class="lbl">events/ngày<br>processed</span>
+    </div>
+    <div class="stat-card">
+      <span class="num">1.2s</span>
+      <span class="lbl">p95 query<br>Gold mart</span>
+    </div>
+    <div class="stat-card">
+      <span class="num">12×</span>
+      <span class="lbl">Z-ORDER<br>file pruning</span>
+    </div>
+    <div class="stat-card">
+      <span class="num">7</span>
+      <span class="lbl">Delta versions<br>history()</span>
+    </div>
+  </div>
+  <h3>Sample query results</h3>
+  <pre><code>-- "Tenant nào tốn nhất tuần qua?"
+SELECT tenant_id, model, SUM(cost_usd) AS week_cost
+FROM gold.daily_cost_kpi
+WHERE date BETWEEN '2026-04-27' AND '2026-05-03'
+GROUP BY tenant_id, model
+ORDER BY week_cost DESC LIMIT 5;
+
+-- → tenant_acme    gpt-4o            $4,832.21
+-- → tenant_beta    claude-opus-4-7   $1,205.50
+-- → tenant_acme    text-embed-3      $   88.40
+-- ...
+
+-- "Dashboard cho CEO: cost trend 30 ngày"
+SELECT date, SUM(cost_usd) AS daily_cost
+FROM gold.daily_cost_kpi
+WHERE date &gt;= current_date - INTERVAL 30 DAYS
+GROUP BY date ORDER BY date;
+-- → 30 rows, query time = 47ms (DuckDB on Gold)</code></pre>
+  <div class="insight">Số <em>cụ thể</em> bao giờ cũng thuyết phục hơn số <em>chung chung</em>. "12× pruning" cụ thể hơn "nhanh hơn nhiều"; "47ms" cụ thể hơn "real-time". Khi present, luôn có 1 con số đo được để stakeholder nhớ.</div>
+  <div class="footer"><span>Numbers</span><span>14 / 16</span></div>
+</section>
+
+<!-- ─────────────────────────── Slide 15: Lessons learned ─────────────────────────── -->
+<section class="slide">
+  <div class="header"><span class="brand">VinUni AI20k</span><span>REFLECTION · Slide 15/16</span></div>
+  <h2>🎓 Lessons Learned (góc nhìn sinh viên)</h2>
+  <div class="grid-2">
+    <div class="card green">
+      <div class="label">✅ Cái đã đúng</div>
+      <ul>
+        <li>Chọn problem theo decision matrix → tránh paralysis</li>
+        <li>Viết problem statement <em>trước</em> kiến trúc</li>
+        <li>Reuse Delta từ lab → tiết kiệm 2 ngày học format mới</li>
+        <li>Buffer day D7 → kịp deadline dù D6 trễ</li>
+        <li>Mô tả từng "không chọn" trong trade-offs slide</li>
+      </ul>
+    </div>
+    <div class="card orange">
+      <div class="label">⚠️ Cái cần làm khác lần sau</div>
+      <ul>
+        <li>Lúc đầu định dùng Iceberg cho "đẹp" — phí 1 buổi research mà không apply</li>
+        <li>Schema Bronze ban đầu thiếu <code>schema_version</code> → bài học từ slide 23</li>
+        <li>Quên PII handling đến scenario 3 mới nhớ — phải gắn từ đầu</li>
+      </ul>
+    </div>
+    <div class="card blue">
+      <div class="label">🔮 Future work nếu scale 10×</div>
+      <ul>
+        <li>Migrate Delta → Iceberg để có hidden partitioning</li>
+        <li>Trino cluster thay DuckDB single-node</li>
+        <li>Real streaming (Flink) thay micro-batch</li>
+        <li>Multi-region (HCM + HN) với active-active</li>
+      </ul>
+    </div>
+    <div class="card purple">
+      <div class="label">🧠 Insight về môn học</div>
+      <ul>
+        <li>"Lakehouse" không phải 1 tool — là <em>tập hợp</em> các quyết định</li>
+        <li>Medallion là khuôn mẫu suy nghĩ, không phải obligation</li>
+        <li>ACID trên S3 = "magic" nhờ <code>_delta_log</code> JSON files</li>
+        <li>Production = handle 4 failure modes, không chỉ happy path</li>
+      </ul>
+    </div>
+  </div>
+  <div class="insight">Quan trọng nhất tôi học: <strong>kiến trúc tốt = ít opinion hơn, nhiều constraint hơn</strong>. Khi tôi viết "tại sao chọn Delta", tôi list constraint (1 tuần, đã quen, 100k req/ngày) — không list opinion ("Delta xịn hơn"). Constraint khách quan, opinion chủ quan.</div>
+  <div class="footer"><span>What I learned</span><span>15 / 16</span></div>
+</section>
+
+<!-- ─────────────────────────── Slide 16: Q&A / Closing ─────────────────────────── -->
+<section class="slide title-slide">
+  <div class="badge">Q&amp;A</div>
+  <h1 style="font-size: 2.6em;">Cảm ơn!</h1>
+  <p class="subtitle">Sẵn sàng cho câu hỏi 🙋</p>
+  <div class="grid-2" style="max-width: 800px; margin-top: 20px; width: 100%;">
+    <div class="card green">
+      <div class="label">📦 Artifacts đã nộp</div>
+      <ul style="text-align: left; font-size: 0.9em;">
+        <li><code>BONUS-CHALLENGE.md</code> (markdown writeup)</li>
+        <li>Slide deck HTML (file này)</li>
+        <li>Repo demo: 3 dbt models + Spark job</li>
+        <li>Metabase dashboard screenshot</li>
+        <li>Marquez lineage graph PNG</li>
+      </ul>
+    </div>
+    <div class="card blue">
+      <div class="label">🔗 Tham khảo</div>
+      <ul style="text-align: left; font-size: 0.9em;">
+        <li>Day 18 deck (Track 2)</li>
+        <li>Lab repo: <code>VinUni-AI20k/Day18-Track2-Lakehouse-Lab</code></li>
+        <li><code>DAY18-Lakehouse-DETAILED-Walkthrough.md</code></li>
+        <li>Delta Lake docs · OpenLineage spec</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card" style="margin-top: 20px; max-width: 700px; border-left: 3px solid var(--vin-gold);">
+    <p style="font-style: italic; text-align: center; font-size: 0.95em;">
+      "Tôi không chứng minh tôi <em>biết hết</em> về lakehouse.<br>
+      Tôi chứng minh tôi biết <em>chọn cái phù hợp</em> cho 1 problem cụ thể, biết <em>biện luận</em> tại sao chọn, và biết <em>cái gì có thể sai</em>."
+    </p>
+  </div>
+  <p style="margin-top: 24px; color: var(--text-muted); font-size: 0.85em;">— Nguyễn Văn An, AI20k '26 · 04/05/2026</p>
+</section>
+
+</div>
+
+<div class="nav">
+  <button onclick="prev()">◀ Trước</button>
+  <span id="counter" style="color: var(--text-muted); padding: 6px 10px;">1 / 16</span>
+  <button onclick="next()">Sau ▶</button>
+</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  let current = 0;
+  const total = slides.length;
+  const counter = document.getElementById('counter');
+  const progress = document.getElementById('progress');
+
+  function show(i) {
+    slides[current].classList.remove('active');
+    current = (i + total) % total;
+    slides[current].classList.add('active');
+    counter.textContent = `${current + 1} / ${total}`;
+    progress.style.width = `${((current + 1) / total) * 100}%`;
+    slides[current].scrollTop = 0;
+  }
+  function next() { show(current + 1); }
+  function prev() { show(current - 1); }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { next(); e.preventDefault(); }
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') { prev(); e.preventDefault(); }
+    if (e.key === 'Home') { show(0); }
+    if (e.key === 'End') { show(total - 1); }
+  });
+
+  // Init
+  progress.style.width = `${(1 / total) * 100}%`;
+</script>
+
+</body>
+</html>
